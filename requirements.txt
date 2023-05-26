@@ -3,5 +3,3 @@ flask_httpauth
 flask-jwt-extended
 pymongo
 python-dotenv
-uwsgi
-uwsgidecorators

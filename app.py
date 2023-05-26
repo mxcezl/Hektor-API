@@ -90,6 +90,7 @@ def url_fuzzer_domain():
     scan_id = str(uuid.uuid4())
 
     init_db_fuzz_object(scan_id, db)
+
     thread = Thread(target=perform_scan_background, kwargs={'domain': domain, 'db': db, 'scan_id': scan_id})
     thread.start()
 
@@ -101,14 +102,12 @@ def get_scan_result(scan_id):
     # Vérifiez si le scan est terminé en consultant la base de données
     scan = db.urls.find_one({'_id': scan_id})
     
-    if scan and scan.get('status') == 'FINISHED':
+    if scan:
         return jsonify(scan), 200
-    elif scan:
-        return jsonify({"message": "Scan en cours"}), 400
 
     return jsonify({"error": "Scan introuvable"}), 400
 
 
 if __name__ == '__main__':
     load_environment()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=True)

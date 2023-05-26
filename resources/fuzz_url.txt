@@ -64,6 +64,7 @@
 .AppleDesktop
 .AppleDouble
 .apport-ignore.xml
+sites/default/files/media/2021-12/uphf-logo.svg
 .appveyor.yml
 .apt_generated/
 .arcconfig
