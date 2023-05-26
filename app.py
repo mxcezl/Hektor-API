@@ -1,16 +1,15 @@
-import multiprocessing
 import os
 from threading import Thread
 import uuid
-from bson import ObjectId
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token
 from scanner.subdomain_scanner import scan_domain
-from scanner.url_fuzzer import fuzz_urls, init_db_fuzz_object
-from tasks import perform_scan_background
+from scanner.url_fuzzer import init_db_fuzz_object
+from scanner.port_scanner import init_db_port_object
+from tasks import perform_url_scan_background, perform_ports_scan_background
 
 app = Flask(__name__)
 jwt = JWTManager(app)
@@ -91,14 +90,14 @@ def url_fuzzer_domain():
 
     init_db_fuzz_object(scan_id, db)
 
-    thread = Thread(target=perform_scan_background, kwargs={'domain': domain, 'db': db, 'scan_id': scan_id})
+    thread = Thread(target=perform_url_scan_background, kwargs={'domain': domain, 'db': db, 'scan_id': scan_id})
     thread.start()
 
     return jsonify({"scan_id": scan_id}), 200
 
-@app.route('/scan/result/<scan_id>', methods=['GET'])
+@app.route('/scan/url_fuzzer/result/<scan_id>', methods=['GET'])
 @jwt_required()
-def get_scan_result(scan_id):
+def get_url_scan_result(scan_id):
     # Vérifiez si le scan est terminé en consultant la base de données
     scan = db.urls.find_one({'_id': scan_id})
     
@@ -107,6 +106,41 @@ def get_scan_result(scan_id):
 
     return jsonify({"error": "Scan introuvable"}), 400
 
+@app.route('/scan/ports', methods=['POST'])
+@jwt_required()
+def scan_ports():
+    if not request.is_json:
+        return jsonify({"msg": "Missing JSON in request"}), 400
+
+    data = request.get_json()
+    ips = data.get('ips')
+
+    # remove duplicates
+    ips = list(set(ips))
+    
+    if not ips:
+        return jsonify({"error": "No IPs provided"}), 400
+
+    # Générez un identifiant unique pour le scan
+    scan_id = str(uuid.uuid4())
+
+    init_db_port_object(scan_id, db, ips)
+    
+    thread = Thread(target=perform_ports_scan_background, kwargs={'ips': ips, 'db': db, 'scan_id': scan_id})
+    thread.start()
+
+    return jsonify({"scan_id": scan_id}), 200
+
+@app.route('/scan/ports/result/<scan_id>', methods=['GET'])
+@jwt_required()
+def get_port_scan_result(scan_id):
+    # Vérifiez si le scan est terminé en consultant la base de données
+    scan = db.ports.find_one({'_id': scan_id})
+    
+    if scan:
+        return jsonify(scan), 200
+
+    return jsonify({"error": "Scan introuvable"}), 400
 
 if __name__ == '__main__':
     load_environment()

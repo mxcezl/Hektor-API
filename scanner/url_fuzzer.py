@@ -47,7 +47,9 @@ def fuzz_urls(domain, db, scan_id):
         }})
 
         urls = [urljoin(domain, fuzzer.strip()) for fuzzer in lines]
-        [fuzz_url(url) for url in urls]
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            executor.map(fuzz_url, urls)
     
     scan_results.save_to_mongo()
 

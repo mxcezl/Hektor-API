@@ -35,7 +35,6 @@ class URLFuzzResult:
         }
     
     def save_to_mongo(self):
-        print('debug: ', self.db)
         self.db.urls.update_one({'_id': self.id}, {'$set': {
             'status': 'FINISHED',
             'urls': self.urls,

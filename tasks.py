@@ -1,5 +1,8 @@
+from scanner.port_scanner import scan_ips
 from scanner.url_fuzzer import fuzz_urls
 
-def perform_scan_background(domain, db, scan_id):
+def perform_url_scan_background(domain, db, scan_id):
     results = fuzz_urls(domain, db, scan_id)
-    results.save_to_mongo(db, scan_id)
+
+def perform_ports_scan_background(ips, db, scan_id):
+    results = scan_ips(ips, db, scan_id)

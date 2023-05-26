@@ -3,3 +3,4 @@ flask_httpauth
 flask-jwt-extended
 pymongo
 python-dotenv
+ping3
