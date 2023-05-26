@@ -17,9 +17,10 @@ class URLFuzzResult:
             'urls': self.urls,
         }
     
-    def save_to_mongo(self, db):
+    def save_to_mongo(self, db, scan_id):
         # Insert the urls into the MongoDB collection
         result = db.urls.insert_one({
+            '_id': scan_id,
             'domain': self.domain,
             'urls': self.urls
             })
