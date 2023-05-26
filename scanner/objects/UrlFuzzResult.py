@@ -18,12 +18,12 @@ class URLFuzzResult:
         }
     
     def save_to_mongo(self, db, scan_id):
-        # Insert the urls into the MongoDB collection
-        result = db.urls.insert_one({
-            '_id': scan_id,
+        # Via the id of the scan, update the document in the database
+        result = db.urls.update_one({'_id': scan_id}, {'$set': {
+            'status': 'FINISHED',
+            'urls': self.urls,
             'domain': self.domain,
-            'urls': self.urls
-            })
-
+        }})
+           
         # Set the id of this object to the generated _id
         self.id = result.inserted_id

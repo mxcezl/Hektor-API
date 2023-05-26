@@ -9,7 +9,7 @@ from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token
 from scanner.subdomain_scanner import scan_domain
-from scanner.url_fuzzer import fuzz_urls
+from scanner.url_fuzzer import fuzz_urls, init_db_fuzz_object
 from tasks import perform_scan_background
 
 app = Flask(__name__)
@@ -89,6 +89,7 @@ def url_fuzzer_domain():
     # Générez un identifiant unique pour le scan
     scan_id = str(uuid.uuid4())
 
+    init_db_fuzz_object(scan_id, db)
     thread = Thread(target=perform_scan_background, kwargs={'domain': domain, 'db': db, 'scan_id': scan_id})
     thread.start()
 
@@ -100,9 +101,10 @@ def get_scan_result(scan_id):
     # Vérifiez si le scan est terminé en consultant la base de données
     scan = db.urls.find_one({'_id': scan_id})
     
-    if scan:
-        results = scan.get('urls', [])
-        return jsonify(results), 200
+    if scan and scan.get('status') == 'FINISHED':
+        return jsonify(scan), 200
+    elif scan:
+        return jsonify({"message": "Scan en cours"}), 400
 
     return jsonify({"error": "Scan introuvable"}), 400
 
