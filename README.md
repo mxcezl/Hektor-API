@@ -4,14 +4,22 @@ Hektor is a tool to automate the process of gathering subdomains from different 
 
 ## Installation
 
-First, install `dnsdumpster`:
+Run HektorAPI with Docker:
 
 ```bash
-pip install https://github.com/PaulSec/API-dnsdumpster.com/archive/master.zip --user
+docker build -t hektor-api .
+docker run --env-file .\.env -p 5000:5000 hektor-api
 ```
 
-Then install other dependencies:
+You need to create a .env file with the following variables in the root directory of the project:
 
 ```bash
-pip install -r requirements.txt
+JWT_SECRET_KEY=JWT_SECRET_KEY
+ADMIN_PASSWORD=ADMIN_PASSWORD
+MONGODB_USERNAME=MONGODB_USERNAME
+MONGODB_PASSWORD=MONGODB_PASSWORD
+MONGODB_URL=MONGODB_URL
+MONGODB_DB=MONGODB_DB
 ```
+
+> **Note:** You need to replace the values with your own.
