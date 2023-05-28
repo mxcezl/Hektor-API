@@ -200,6 +200,9 @@ def scan_ports():
     scans_ids = []
 
     for ip in ips:
+        if db.ports.find_one({'ip': ip}):
+            scans_ids.append(db.ports.find_one({'ip': ip})['_id'])
+            continue
         scan_id = str(uuid.uuid4())
         init_db_port_object(scan_id, db, ip, username)
         thread = Thread(target=perform_ports_scan_background, kwargs={'ip': ip, 'db': db, 'scan_id': scan_id})
