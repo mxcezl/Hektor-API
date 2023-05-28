@@ -7,10 +7,11 @@ import sys
 from ping3 import ping
 from scanner.objects import IPScanResult, PortScanResultPerIP
 
-def init_db_port_object(id, db, ips):
+def init_db_port_object(id, db, ips, username):
     return db.ports.insert_one({
         '_id': id,
         'ips': ips,
+        'user': username,
         'status': 'PENDING',
     })
 

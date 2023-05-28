@@ -6,9 +6,10 @@ from scanner.objects import UrlFuzzResult, UrlScanResult
 
 forbidden_status_codes = [400, 401, 403, 404, 405, 406, 407, 408, 409, 410, 411, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 426, 428, 429, 431, 451, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511]
 
-def init_db_fuzz_object(id, db):
+def init_db_fuzz_object(id, username, db):
     return db.urls.insert_one({
         '_id': id,
+        'user': username,
         'status': 'PENDING',
     })
 

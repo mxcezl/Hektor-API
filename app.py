@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import JWTManager, get_jwt, jwt_required, create_access_token, verify_jwt_in_request
+from flask_jwt_extended import JWTManager, get_jwt, get_jwt_identity, jwt_required, create_access_token, verify_jwt_in_request
 from scanner.subdomain_scanner import scan_domain
 from scanner.url_fuzzer import init_db_fuzz_object
 from scanner.port_scanner import init_db_port_object
@@ -116,7 +116,10 @@ def scan_subdomain():
     domain = data.get('domain')
     if not domain:
         return jsonify({"error": "No domain provided"}), 400
-    results = scan_domain(domain)
+    
+    username = get_jwt_identity()
+
+    results = scan_domain(domain, username)
     results.save_to_mongo(db)
     return jsonify(results.to_dict()), 200
 
@@ -134,8 +137,9 @@ def url_fuzzer_domain():
 
     # Générez un identifiant unique pour le scan
     scan_id = str(uuid.uuid4())
+    username = get_jwt_identity()
 
-    init_db_fuzz_object(scan_id, db)
+    init_db_fuzz_object(scan_id, username, db)
 
     thread = Thread(target=perform_url_scan_background, kwargs={'domain': domain, 'db': db, 'scan_id': scan_id})
     thread.start()
@@ -146,10 +150,11 @@ def url_fuzzer_domain():
 @jwt_required()
 @rapporter_or_pentester_required
 def get_url_scan_result(scan_id):
-    # Vérifiez si le scan est terminé en consultant la base de données
     scan = db.urls.find_one({'_id': scan_id})
-    
+
     if scan:
+        del scan['user']
+        del scan['_id']
         return jsonify(scan), 200
 
     return jsonify({"error": "Scan introuvable"}), 400
@@ -172,8 +177,9 @@ def scan_ports():
 
     # Générez un identifiant unique pour le scan
     scan_id = str(uuid.uuid4())
+    username = get_jwt_identity()
 
-    init_db_port_object(scan_id, db, ips)
+    init_db_port_object(scan_id, db, ips, username)
     
     thread = Thread(target=perform_ports_scan_background, kwargs={'ips': ips, 'db': db, 'scan_id': scan_id})
     thread.start()
@@ -188,9 +194,48 @@ def get_port_scan_result(scan_id):
     scan = db.ports.find_one({'_id': scan_id})
     
     if scan:
+        del scan['user']
+        del scan['_id']
         return jsonify(scan), 200
 
     return jsonify({"error": "Scan introuvable"}), 400
+
+@app.route('/my_scans', methods=['GET'])
+@jwt_required()
+@pentester_required
+def get_user_scans():
+    username = get_jwt_identity()
+    url_scans = db.urls.find({'user': username})
+    host_scans = db.hosts.find({'user': username})
+    port_scans = db.ports.find({'user': username})
+
+    # Convertir les objets Cursor en listes de dictionnaires
+    url_scans = [scan for scan in url_scans]
+    host_scans = [scan for scan in host_scans]
+    port_scans = [scan for scan in port_scans]
+
+    for scan_list in [url_scans, host_scans, port_scans]:
+        for scan in scan_list:
+            # Supprimer les champs indésirables de la réponse
+            if 'user' in scan: del scan['user']
+            if '_id' in scan: del scan['_id']
+            
+    return jsonify(url_scans=url_scans, host_scans=host_scans, port_scans=port_scans), 200
+
+@app.route('/my_scans_ids', methods=['GET'])
+@jwt_required()
+def get_user_scans_ids():
+    username = get_jwt_identity()
+    url_scans = db.urls.find({'user': username}, {'_id': 1})
+    host_scans = db.hosts.find({'user': username}, {'_id': 1})
+    port_scans = db.ports.find({'user': username}, {'_id': 1})
+
+    # Convertir les objets Cursor en listes d'identifiants
+    url_scans = [str(scan['_id']) for scan in url_scans]
+    host_scans = [str(scan['_id']) for scan in host_scans]
+    port_scans = [str(scan['_id']) for scan in port_scans]
+
+    return jsonify(url_scans=url_scans, host_scans=host_scans, port_scans=port_scans), 200
 
 if __name__ == '__main__':
     load_environment()
