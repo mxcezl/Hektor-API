@@ -33,19 +33,8 @@ def fuzz_urls(domain, db, scan_id):
         except Exception:
             pass
 
-        scan_results.total_scanned += 1
-
-        if scan_results.total_scanned % 100 == 0:
-            db.urls.update_one({'_id': scan_id}, {'$set': {'total_scanned': scan_results.total_scanned}})
-
     with open(path, 'r') as file:
         lines = file.readlines()
-
-        db.urls.update_one({'_id': scan_id}, {'$set': {
-            'total_to_scan': len(lines),
-            'total_scanned': 0,
-            'total_found': 0,
-        }})
 
         urls = [urljoin(domain, fuzzer.strip()) for fuzzer in lines]
         

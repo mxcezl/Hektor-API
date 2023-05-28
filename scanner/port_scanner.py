@@ -5,12 +5,12 @@ import concurrent.futures
 import re
 import sys
 from ping3 import ping
-from scanner.objects import IPScanResult, PortScanResultPerIP
+from scanner.objects import PortScanResultPerIP
 
-def init_db_port_object(id, db, ips, username):
+def init_db_port_object(id, db, ip, username):
     return db.ports.insert_one({
         '_id': id,
-        'ips': ips,
+        'ip': ip,
         'user': username,
         'status': 'PENDING',
     })
@@ -46,7 +46,7 @@ def scan_port(ip, port):
             pass
     sock.close()
 
-def scan_ip(ip, scan_id, db):
+def process_scan(ip, scan_id, db):
     if not is_valid_ip(ip):
         return PortScanResultPerIP.IPScanResult(ip, error='invalid IP address')
     if not is_up(ip):
@@ -65,7 +65,7 @@ def scan_ip(ip, scan_id, db):
     with open(path, 'r') as file:
         ports_to_scan = [int(port.strip()) for port in file.readlines()]
 
-    scan_result = PortScanResultPerIP.IPScanResult(ip)
+    scan_result = PortScanResultPerIP.IPScanResult(ip, db)
 
     with ThreadPoolExecutor(max_workers=50) as executor:
         futures = [executor.submit(scan_port, ip, port) for port in ports_to_scan]
@@ -74,18 +74,15 @@ def scan_ip(ip, scan_id, db):
             if result is not None and result['port'] is not None and result['service'] is not None:
                 scan_result.append_port(int(result['port']), str(result['service']))
                 db.ports.update_one(
-                        {'_id': scan_id, 'results.ip': ip},
-                        {'$set': {'results.$.open_ports': scan_result.open_ports}}
-                    )
+                        {'_id': scan_id, 'ip': ip, 'open_ports': {'$ne': int(result['port'])}},
+                        {'$push': {'open_ports': int(result['port'])}}
+                )
+            db.ports.update_one({'_id': scan_id}, {'$set': {'status': 'FINISHED'}})
             
     return scan_result
 
-def scan_ips(ips, db, id=None):
-    ip_fuzz_result = IPScanResult.IPFuzzResult(ips, db, id)
-    with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(scan_ip, ip, id, db) for ip in ips]
-        for future in concurrent.futures.as_completed(futures):
-            ip_scan_result = future.result()
-            ip_fuzz_result.append(ip_scan_result)
-    ip_fuzz_result.save_to_mongo()
-    return ip_fuzz_result
+def scan_ip(ip, db, id):
+    #TODO
+    result = process_scan(ip, id, db)
+    result.save_mongo()
+    return result

@@ -77,6 +77,9 @@ def admin_required(fn):
 def pentester_required(fn):
     return role_required(['PENTESTER', 'ADMIN'], "This route can be accessed only by ADMIN or PENTESTER users.")(fn)
 
+def rapporter_required(fn):
+    return role_required(['RAPPORTER', 'ADMIN'], "This route can be accessed only by ADMIN or RAPPORTER users.")(fn)
+
 def rapporter_or_pentester_required(fn):
     return role_required(['RAPPORTER', 'PENTESTER', 'ADMIN'], "This route can be accessed only by ADMIN, PENTESTER or RAPPORTER users.")(fn)
 
@@ -151,11 +154,23 @@ def url_fuzzer_domain():
 
     return jsonify({"scan_id": scan_id}), 200
 
-@app.route('/scan/url_fuzzer/result/<scan_id>', methods=['GET'])
+@app.route('/result/scan/url_fuzzer', methods=['GET'])
 @jwt_required()
 @rapporter_or_pentester_required
-def get_url_scan_result(scan_id):
-    scan = db.urls.find_one({'_id': scan_id})
+def get_scan_result():
+    scan_id = request.args.get('scan_id')
+    domain = request.args.get('domain')
+
+    if scan_id and domain:
+        return jsonify({"error": "Provide either scan_id or domain, not both"}), 400
+
+    if not scan_id and not domain:
+        return jsonify({"error": "Provide scan_id or domain"}), 400
+
+    if scan_id:
+        scan = db.urls.find_one({'_id': scan_id})
+    else:
+        scan = db.urls.find_one({'domain': domain})
 
     if scan:
         del scan['user']
@@ -180,24 +195,37 @@ def scan_ports():
     if not ips:
         return jsonify({"error": "No IPs provided"}), 400
 
-    # Générez un identifiant unique pour le scan
-    scan_id = str(uuid.uuid4())
     username = get_jwt_identity()
-
-    init_db_port_object(scan_id, db, ips, username)
     
-    thread = Thread(target=perform_ports_scan_background, kwargs={'ips': ips, 'db': db, 'scan_id': scan_id})
-    thread.start()
+    scans_ids = []
 
-    return jsonify({"scan_id": scan_id}), 200
+    for ip in ips:
+        scan_id = str(uuid.uuid4())
+        init_db_port_object(scan_id, db, ip, username)
+        thread = Thread(target=perform_ports_scan_background, kwargs={'ip': ip, 'db': db, 'scan_id': scan_id})
+        thread.start()
+        scans_ids.append(scan_id)
 
-@app.route('/scan/ports/result/<scan_id>', methods=['GET'])
+    return jsonify({"scans_ids": scans_ids}), 200
+
+@app.route('/result/scan/ports', methods=['GET'])
 @jwt_required()
 @rapporter_or_pentester_required
-def get_port_scan_result(scan_id):
-    # Vérifiez si le scan est terminé en consultant la base de données
-    scan = db.ports.find_one({'_id': scan_id})
-    
+def get_port_scan_result():
+    scan_id = request.args.get('scan_id')
+    ip = request.args.get('ip')
+
+    if scan_id and ip:
+        return jsonify({"error": "Provide either scan_id or ip, not both"}), 400
+
+    if not scan_id and not ip:
+        return jsonify({"error": "Provide scan_id or ip"}), 400
+
+    if scan_id:
+        scan = db.ports.find_one({'_id': scan_id})
+    else:
+        scan = db.ports.find_one({'ip': ip})
+
     if scan:
         del scan['user']
         del scan['_id']
@@ -208,8 +236,37 @@ def get_port_scan_result(scan_id):
 @app.route('/my_scans', methods=['GET'])
 @jwt_required()
 @pentester_required
-def get_user_scans():
+def get_current_user_scans():
     username = get_jwt_identity()
+    url_scans = db.urls.find({'user': username})
+    host_scans = db.hosts.find({'user': username})
+    port_scans = db.ports.find({'user': username})
+
+    # Convertir les objets Cursor en listes de dictionnaires
+    url_scans = [scan for scan in url_scans]
+    host_scans = [scan for scan in host_scans]
+    port_scans = [scan for scan in port_scans]
+
+    for scan_list in [url_scans, host_scans, port_scans]:
+        for scan in scan_list:
+            # Supprimer les champs indésirables de la réponse
+            if 'user' in scan: del scan['user']
+            if '_id' in scan: del scan['_id']
+            
+    return jsonify(url_scans=url_scans, host_scans=host_scans, port_scans=port_scans), 200
+
+@app.route('/result/scans', methods=['GET'])
+@jwt_required()
+@rapporter_or_pentester_required
+def get_user_scans():
+    username = request.args.get('username')
+
+    if not username:
+        return jsonify({"error": "Provide username"}), 400
+    
+    if db.users.find_one({'username': username}) is None:
+        return jsonify({"error": "User not found"}), 400
+
     url_scans = db.urls.find({'user': username})
     host_scans = db.hosts.find({'user': username})
     port_scans = db.ports.find({'user': username})
@@ -235,7 +292,6 @@ def get_user_scans_ids():
     host_scans = db.hosts.find({'user': username}, {'_id': 1})
     port_scans = db.ports.find({'user': username}, {'_id': 1})
 
-    # Convertir les objets Cursor en listes d'identifiants
     url_scans = [str(scan['_id']) for scan in url_scans]
     host_scans = [str(scan['_id']) for scan in host_scans]
     port_scans = [str(scan['_id']) for scan in port_scans]
