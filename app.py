@@ -1,3 +1,4 @@
+from functools import wraps
 import os
 from threading import Thread
 import uuid
@@ -5,7 +6,7 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import JWTManager, jwt_required, create_access_token
+from flask_jwt_extended import JWTManager, get_jwt, jwt_required, create_access_token, verify_jwt_in_request
 from scanner.subdomain_scanner import scan_domain
 from scanner.url_fuzzer import init_db_fuzz_object
 from scanner.port_scanner import init_db_port_object
@@ -14,9 +15,6 @@ from tasks import perform_url_scan_background, perform_ports_scan_background
 app = Flask(__name__)
 jwt = JWTManager(app)
 
-users = {
-    "admin": None,
-}
 client = None
 db = None
 
@@ -37,8 +35,34 @@ def load_environment():
     client = get_mongo_client()
     global db
     db = client[os.environ.get('MONGODB_DB')]
-    global users
-    users['admin'] = generate_password_hash(os.environ.get('ADMIN_PASSWORD'))
+
+@app.route('/register', methods=['POST'])
+def register():
+    if not request.is_json:
+        return jsonify({"msg": "Missing JSON in request"}), 400
+
+    username = request.json.get('username', None)
+    password = request.json.get('password', None)
+    role = request.json.get('role', None)
+
+    if not username:
+        return jsonify({"msg": "Missing username parameter"}), 400
+    if not password:
+        return jsonify({"msg": "Missing password parameter"}), 400
+    if not role:
+        return jsonify({"msg": "Missing role parameter. Valid roles are PENTESTER and RAPPORTER"}), 400
+    if role not in ['PENTESTER', 'RAPPORTER']:
+        return jsonify({"msg": "Invalid role parameter"}), 400
+
+    # Vérifier si l'utilisateur existe déjà
+    user = db.users.find_one({"username": username})
+    if user:
+        return jsonify({"msg": "Username already exists"}), 400
+
+    hashed_password = generate_password_hash(password)
+    db.users.insert_one({"username": username, "password": hashed_password, "role": role})
+
+    return jsonify({"msg": "User " + username + " created successfully"}), 201
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -53,14 +77,37 @@ def login():
     if not password:
         return jsonify({"msg": "Missing password parameter"}), 400
 
-    if username in users and check_password_hash(users.get(username), password):
-        access_token = create_access_token(identity=username)
+    user = db.users.find_one({"username": username})
+
+    if user and check_password_hash(user.get("password"), password):
+        # Ajouter le rôle dans le JWT
+        access_token = create_access_token(identity=username, additional_claims={"role": user.get("role")})
         return jsonify(access_token=access_token), 200
 
     return jsonify({"msg": "Bad username or password"}), 401
 
+def role_required(roles, message):
+    def wrapper(fn):
+        @wraps(fn)
+        def decorator(*args, **kwargs):
+            verify_jwt_in_request()
+            claims = get_jwt()
+            if claims['role'] not in roles:
+                return jsonify(error='Access denied. ' + message), 403
+            else:
+                return fn(*args, **kwargs)
+        return decorator
+    return wrapper
+
+def pentester_required(fn):
+    return role_required(['PENTESTER'], "This route can be accessed only by PENTESTER users.")(fn)
+
+def rapporter_or_pentester_required(fn):
+    return role_required(['RAPPORTER', 'PENTESTER'], "This route can be accessed only by PENTESTER or RAPPORTER users.")(fn)
+
 @app.route('/scan/subdomain', methods=['POST'])
 @jwt_required()
+@pentester_required
 def scan_subdomain():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -73,9 +120,9 @@ def scan_subdomain():
     results.save_to_mongo(db)
     return jsonify(results.to_dict()), 200
 
-
 @app.route('/scan/url_fuzzer', methods=['POST'])
 @jwt_required()
+@pentester_required
 def url_fuzzer_domain():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -97,6 +144,7 @@ def url_fuzzer_domain():
 
 @app.route('/scan/url_fuzzer/result/<scan_id>', methods=['GET'])
 @jwt_required()
+@rapporter_or_pentester_required
 def get_url_scan_result(scan_id):
     # Vérifiez si le scan est terminé en consultant la base de données
     scan = db.urls.find_one({'_id': scan_id})
@@ -108,6 +156,7 @@ def get_url_scan_result(scan_id):
 
 @app.route('/scan/ports', methods=['POST'])
 @jwt_required()
+@pentester_required
 def scan_ports():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -133,6 +182,7 @@ def scan_ports():
 
 @app.route('/scan/ports/result/<scan_id>', methods=['GET'])
 @jwt_required()
+@rapporter_or_pentester_required
 def get_port_scan_result(scan_id):
     # Vérifiez si le scan est terminé en consultant la base de données
     scan = db.ports.find_one({'_id': scan_id})
