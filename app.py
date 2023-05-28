@@ -36,34 +36,6 @@ def load_environment():
     global db
     db = client[os.environ.get('MONGODB_DB')]
 
-@app.route('/register', methods=['POST'])
-def register():
-    if not request.is_json:
-        return jsonify({"msg": "Missing JSON in request"}), 400
-
-    username = request.json.get('username', None)
-    password = request.json.get('password', None)
-    role = request.json.get('role', None)
-
-    if not username:
-        return jsonify({"msg": "Missing username parameter"}), 400
-    if not password:
-        return jsonify({"msg": "Missing password parameter"}), 400
-    if not role:
-        return jsonify({"msg": "Missing role parameter. Valid roles are PENTESTER and RAPPORTER"}), 400
-    if role not in ['PENTESTER', 'RAPPORTER']:
-        return jsonify({"msg": "Invalid role parameter"}), 400
-
-    # Vérifier si l'utilisateur existe déjà
-    user = db.users.find_one({"username": username})
-    if user:
-        return jsonify({"msg": "Username already exists"}), 400
-
-    hashed_password = generate_password_hash(password)
-    db.users.insert_one({"username": username, "password": hashed_password, "role": role})
-
-    return jsonify({"msg": "User " + username + " created successfully"}), 201
-
 @app.route('/login', methods=['POST'])
 def login():
     if not request.is_json:
@@ -99,11 +71,44 @@ def role_required(roles, message):
         return decorator
     return wrapper
 
+def admin_required(fn):
+    return role_required(['ADMIN'], "This route can be accessed only by ADMIN users.")(fn)
+
 def pentester_required(fn):
-    return role_required(['PENTESTER'], "This route can be accessed only by PENTESTER users.")(fn)
+    return role_required(['PENTESTER', 'ADMIN'], "This route can be accessed only by ADMIN or PENTESTER users.")(fn)
 
 def rapporter_or_pentester_required(fn):
-    return role_required(['RAPPORTER', 'PENTESTER'], "This route can be accessed only by PENTESTER or RAPPORTER users.")(fn)
+    return role_required(['RAPPORTER', 'PENTESTER', 'ADMIN'], "This route can be accessed only by ADMIN, PENTESTER or RAPPORTER users.")(fn)
+
+@app.route('/register', methods=['POST'])
+@jwt_required()
+@admin_required
+def register():
+    if not request.is_json:
+        return jsonify({"msg": "Missing JSON in request"}), 400
+
+    username = request.json.get('username', None)
+    password = request.json.get('password', None)
+    role = request.json.get('role', None)
+
+    if not username:
+        return jsonify({"msg": "Missing username parameter"}), 400
+    if not password:
+        return jsonify({"msg": "Missing password parameter"}), 400
+    if not role:
+        return jsonify({"msg": "Missing role parameter. Valid roles are PENTESTER and RAPPORTER"}), 400
+    if role not in ['PENTESTER', 'RAPPORTER']:
+        return jsonify({"msg": "Invalid role parameter"}), 400
+
+    # Vérifier si l'utilisateur existe déjà
+    user = db.users.find_one({"username": username})
+    if user:
+        return jsonify({"msg": "Username already exists"}), 400
+
+    hashed_password = generate_password_hash(password)
+    db.users.insert_one({"username": username, "password": hashed_password, "role": role})
+
+    return jsonify({"msg": "User " + username + " created successfully"}), 201
 
 @app.route('/scan/subdomain', methods=['POST'])
 @jwt_required()
