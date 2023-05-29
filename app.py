@@ -138,10 +138,16 @@ def scan_subdomain():
     if not domain:
         return jsonify({"error": "No domain provided"}), 400
     
-    username = get_jwt_identity()
+    domain = domain.lower()
+    
+    existing_scan = db.hosts.find_one({"domain": domain})
+    if existing_scan:
+        existing_scan_id = existing_scan["_id"]
+        results = scan_domain(domain, get_jwt_identity(), db, existing_scan_id)
+    else:
+        results = scan_domain(domain, get_jwt_identity(), db)
 
-    results = scan_domain(domain, username)
-    results.save_to_mongo(db)
+    
     return jsonify(results.to_dict()), 200
 
 @app.route('/scan/url_fuzzer', methods=['POST'])

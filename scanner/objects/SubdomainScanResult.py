@@ -3,10 +3,16 @@ import uuid
 from scanner.objects.Host import Host
 
 class SubDomainScanResult:
-    def __init__(self, domain: str, hosts: List[Host], user: str):
+    def __init__(self, domain: str, hosts: List[Host], user: str, db, id = uuid.uuid4()):
+        self.id = id
         self.hosts = hosts
         self.domain = domain
         self.username = user
+        self.db = db
+        if db.hosts.find_one({'_id': str(self.id)}) is None:
+            db.hosts.insert_one({'_id': str(self.id), 'domain': self.domain, 'user': self.username, 'hosts': [host.to_dict() for host in self.hosts]})
+        else:
+            db.hosts.update_one({'_id': str(self.id)}, {'$set': {'user': self.username, 'hosts': [host.to_dict() for host in self.hosts]}})
 
     def to_dict(self):
         return {
@@ -14,12 +20,9 @@ class SubDomainScanResult:
             'hosts': [host.to_dict() for host in self.hosts],
         }
 
-    def save_to_mongo(self, db):
+    def save_to_mongo(self):
         # Convert hosts to a list of dictionaries
         hosts_dicts = [host.to_dict() for host in self.hosts]
 
         # Insert object into the MongoDB collection
-        result = db.hosts.insert_one({'_id': str(uuid.uuid4()),'domain': self.domain, 'user': self.username, 'hosts': hosts_dicts})
-
-        # Set the id of this object to the generated _id
-        self.id = result.inserted_id
+        result = self.db.hosts.update_one({'_id': str(self.id),'domain': self.domain, 'user': self.username, 'hosts': hosts_dicts})
