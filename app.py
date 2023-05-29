@@ -113,6 +113,19 @@ def register():
 
     return jsonify({"msg": "User " + username + " created successfully"}), 201
 
+@app.route('/users', methods=['GET'])
+@jwt_required()
+@admin_required
+def get_all_users():
+    users = db.users.find({})
+    user_dict = {'ADMIN': [], 'PENTESTER': [], 'RAPPORTER': []}
+
+    for user in users:
+        role = user['role']
+        user_dict[role].append(user['username'])
+    
+    return jsonify(user_dict), 200
+
 @app.route('/scan/subdomain', methods=['POST'])
 @jwt_required()
 @pentester_required
