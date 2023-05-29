@@ -1,8 +1,9 @@
 class IPScanResult:
-    def __init__(self, ip: str, db, error: str = None):
+    def __init__(self, ip: str, db, id, error: str = None):
         self.ip = ip
         self.open_ports = None
         self.error = error
+        self.id = id
         self.db = db
         
     def append_port(self, port: int, service: str):
@@ -26,4 +27,4 @@ class IPScanResult:
     def save_mongo(self):
         if self.open_ports is None:
             self.open_ports = []
-        self.db.ports.insert_one(self.to_dict())
+        self.db.ports.update_one({'_id': self.id, 'ip': self.ip}, {'$set': self.to_dict()})

@@ -200,11 +200,15 @@ def scan_ports():
     scans_ids = []
 
     for ip in ips:
-        if db.ports.find_one({'ip': ip}):
-            scans_ids.append(db.ports.find_one({'ip': ip})['_id'])
-            continue
-        scan_id = str(uuid.uuid4())
-        init_db_port_object(scan_id, db, ip, username)
+        existing_scan = db.ports.find_one({'ip': ip})
+        if existing_scan:
+            db.ports.update_one({'ip': ip}, {'$set': {'user': username, 'status': 'PENDING'}})
+            db_scan_id = existing_scan['_id']
+            scan_id = db_scan_id
+        else:
+            scan_id = str(uuid.uuid4())
+            init_db_port_object(scan_id, db, ip, username)
+
         thread = Thread(target=perform_ports_scan_background, kwargs={'ip': ip, 'db': db, 'scan_id': scan_id})
         thread.start()
         scans_ids.append(scan_id)

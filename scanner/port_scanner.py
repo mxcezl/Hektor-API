@@ -65,7 +65,7 @@ def process_scan(ip, scan_id, db):
     with open(path, 'r') as file:
         ports_to_scan = [int(port.strip()) for port in file.readlines()]
 
-    scan_result = PortScanResultPerIP.IPScanResult(ip, db)
+    scan_result = PortScanResultPerIP.IPScanResult(ip, db, scan_id)
 
     with ThreadPoolExecutor(max_workers=50) as executor:
         futures = [executor.submit(scan_port, ip, port) for port in ports_to_scan]
@@ -73,16 +73,13 @@ def process_scan(ip, scan_id, db):
             result = future.result()
             if result is not None and result['port'] is not None and result['service'] is not None:
                 scan_result.append_port(int(result['port']), str(result['service']))
-                db.ports.update_one(
-                        {'_id': scan_id, 'ip': ip, 'open_ports': {'$ne': int(result['port'])}},
-                        {'$push': {'open_ports': int(result['port'])}}
-                )
             db.ports.update_one({'_id': scan_id}, {'$set': {'status': 'FINISHED'}})
-            
+    
+    scan_result.save_mongo()
+    
     return scan_result
 
 def scan_ip(ip, db, id):
     #TODO
     result = process_scan(ip, id, db)
-    result.save_mongo()
     return result
