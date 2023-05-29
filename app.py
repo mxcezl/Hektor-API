@@ -162,11 +162,17 @@ def url_fuzzer_domain():
     if not domain:
         return jsonify({"error": "No domain provided"}), 400
 
-    # Générez un identifiant unique pour le scan
-    scan_id = str(uuid.uuid4())
     username = get_jwt_identity()
+    
+    domain = domain.lower()
+    existing_scan = db.urls.find_one({"domain": domain})
+    if existing_scan:
+        scan_id = existing_scan["_id"]
+        db.urls.update_one({"_id": scan_id}, {"$set": {"status": "PENDING", "user": username}})
+    else:
+        scan_id = str(uuid.uuid4())
+        init_db_fuzz_object(scan_id, username, db)
 
-    init_db_fuzz_object(scan_id, username, db)
 
     thread = Thread(target=perform_url_scan_background, kwargs={'domain': domain, 'db': db, 'scan_id': scan_id})
     thread.start()
