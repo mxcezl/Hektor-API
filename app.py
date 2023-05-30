@@ -4,6 +4,7 @@ from threading import Thread
 import uuid
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
+from flask_cors import CORS, cross_origin
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import JWTManager, get_jwt, get_jwt_identity, jwt_required, create_access_token, verify_jwt_in_request
@@ -14,6 +15,8 @@ from tasks import perform_url_scan_background, perform_ports_scan_background
 
 app = Flask(__name__)
 jwt = JWTManager(app)
+cors = CORS(app)
+app.config['CORS_HEADERS'] = 'Content-Type'
 
 client = None
 db = None
@@ -37,6 +40,7 @@ def load_environment():
     db = client[os.environ.get('MONGODB_DB')]
 
 @app.route('/login', methods=['POST'])
+@cross_origin()
 def login():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -86,6 +90,7 @@ def rapporter_or_pentester_required(fn):
 @app.route('/register', methods=['POST'])
 @jwt_required()
 @admin_required
+@cross_origin()
 def register():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -116,6 +121,7 @@ def register():
 @app.route('/users', methods=['GET'])
 @jwt_required()
 @admin_required
+@cross_origin()
 def get_all_users():
     users = db.users.find({})
     user_dict = {'ADMIN': [], 'PENTESTER': [], 'RAPPORTER': []}
@@ -129,6 +135,7 @@ def get_all_users():
 @app.route('/scan/subdomain', methods=['POST'])
 @jwt_required()
 @pentester_required
+@cross_origin()
 def scan_subdomain():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -153,6 +160,7 @@ def scan_subdomain():
 @app.route('/scan/url_fuzzer', methods=['POST'])
 @jwt_required()
 @pentester_required
+@cross_origin()
 def url_fuzzer_domain():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -182,6 +190,7 @@ def url_fuzzer_domain():
 @app.route('/result/scan/url_fuzzer', methods=['GET'])
 @jwt_required()
 @rapporter_or_pentester_required
+@cross_origin()
 def get_scan_result():
     scan_id = request.args.get('scan_id')
     domain = request.args.get('domain')
@@ -207,6 +216,7 @@ def get_scan_result():
 @app.route('/scan/ports', methods=['POST'])
 @jwt_required()
 @pentester_required
+@cross_origin()
 def scan_ports():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -243,6 +253,7 @@ def scan_ports():
 @app.route('/result/scan/ports', methods=['GET'])
 @jwt_required()
 @rapporter_or_pentester_required
+@cross_origin()
 def get_port_scan_result():
     scan_id = request.args.get('scan_id')
     ip = request.args.get('ip')
@@ -268,6 +279,7 @@ def get_port_scan_result():
 @app.route('/my_scans', methods=['GET'])
 @jwt_required()
 @pentester_required
+@cross_origin()
 def get_current_user_scans():
     username = get_jwt_identity()
     url_scans = db.urls.find({'user': username})
@@ -290,6 +302,7 @@ def get_current_user_scans():
 @app.route('/result/scans', methods=['GET'])
 @jwt_required()
 @rapporter_or_pentester_required
+@cross_origin()
 def get_user_scans():
     username = request.args.get('username')
 
@@ -318,6 +331,7 @@ def get_user_scans():
 
 @app.route('/my_scans_ids', methods=['GET'])
 @jwt_required()
+@cross_origin()
 def get_user_scans_ids():
     username = get_jwt_identity()
     url_scans = db.urls.find({'user': username}, {'_id': 1})

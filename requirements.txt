@@ -4,3 +4,4 @@ flask-jwt-extended
 pymongo
 python-dotenv
 ping3
+flask-cors
