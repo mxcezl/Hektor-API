@@ -147,6 +147,7 @@ def scan_subdomain():
     domain = domain.lower()
     
     existing_scan = db.hosts.find_one({"domain": domain})
+    
     if existing_scan:
         existing_scan_id = existing_scan["_id"]
         results = scan_domain(domain, get_jwt_identity(), db, existing_scan_id)

@@ -3,12 +3,14 @@ import uuid
 from scanner.objects.Host import Host
 
 class SubDomainScanResult:
-    def __init__(self, domain: str, hosts: List[Host], user: str, db, id = uuid.uuid4()):
+    def __init__(self, domain: str, hosts: List[Host], user: str, db, id):
         self.id = id
         self.hosts = hosts
         self.domain = domain
         self.username = user
         self.db = db
+        if self.id is None:
+            self.id = uuid.uuid4()
         if db.hosts.find_one({'_id': str(self.id)}) is None:
             db.hosts.insert_one({'_id': str(self.id), 'domain': self.domain, 'user': self.username, 'hosts': [host.to_dict() for host in self.hosts]})
         else:
