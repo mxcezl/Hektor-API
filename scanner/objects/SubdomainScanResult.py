@@ -14,8 +14,6 @@ class SubDomainScanResult:
 
         if db.hosts.find_one({'_id': str(self.id)}) is None:
             db.hosts.insert_one({'_id': str(self.id), 'domain': self.domain, 'user': self.username, 'hosts': [host.to_dict() for host in self.hosts]})
-        else:
-            db.hosts.update_one({'_id': str(self.id)}, {'$set': {'user': self.username, 'hosts': [host.to_dict() for host in self.hosts]}})
 
     def to_dict(self):
         return {
