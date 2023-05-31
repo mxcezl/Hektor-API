@@ -11,6 +11,7 @@ class SubDomainScanResult:
         self.db = db
         if self.id is None:
             self.id = uuid.uuid4()
+            
         if db.hosts.find_one({'_id': str(self.id)}) is None:
             db.hosts.insert_one({'_id': str(self.id), 'domain': self.domain, 'user': self.username, 'hosts': [host.to_dict() for host in self.hosts]})
         else:
@@ -19,6 +20,7 @@ class SubDomainScanResult:
     def to_dict(self):
         return {
             'domain': self.domain,
+            'user': self.username,
             'hosts': [host.to_dict() for host in self.hosts],
         }
 

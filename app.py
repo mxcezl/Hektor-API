@@ -147,13 +147,14 @@ def scan_subdomain():
     domain = domain.lower()
     
     existing_scan = db.hosts.find_one({"domain": domain})
-    
+
     if existing_scan:
         existing_scan_id = existing_scan["_id"]
         results = scan_domain(domain, get_jwt_identity(), db, existing_scan_id)
     else:
         results = scan_domain(domain, get_jwt_identity(), db)
 
+    results.save_to_mongo()
     
     return jsonify(results.to_dict()), 200
 
