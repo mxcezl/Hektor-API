@@ -29,4 +29,4 @@ class SubDomainScanResult:
         hosts_dicts = [host.to_dict() for host in self.hosts]
 
         # Insert object into the MongoDB collection
-        result = self.db.hosts.update_one({'_id': str(self.id)}, {'domain': self.domain, 'user': self.username, 'hosts': hosts_dicts})
+        result = self.db.hosts.update_one({'_id': str(self.id)}, {'$set': {'domain': self.domain, 'user': self.username, 'hosts': hosts_dicts}})
