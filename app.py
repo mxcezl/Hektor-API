@@ -15,8 +15,7 @@ from tasks import perform_url_scan_background, perform_ports_scan_background
 
 app = Flask(__name__)
 jwt = JWTManager(app)
-cors = CORS(app)
-app.config['CORS_HEADERS'] = 'Content-Type'
+cors = CORS(app, resources={r"/*": {"origins": "*"}})
 
 client = None
 db = None
