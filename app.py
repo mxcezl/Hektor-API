@@ -87,9 +87,9 @@ def rapporter_or_pentester_required(fn):
     return role_required(['RAPPORTER', 'PENTESTER', 'ADMIN'], "This route can be accessed only by ADMIN, PENTESTER or RAPPORTER users.")(fn)
 
 @app.route('/register', methods=['POST'])
+@cross_origin()
 @jwt_required()
 @admin_required
-@cross_origin()
 def register():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -118,9 +118,9 @@ def register():
     return jsonify({"msg": "User " + username + " created successfully"}), 201
 
 @app.route('/users', methods=['GET'])
+@cross_origin()
 @jwt_required()
 @admin_required
-@cross_origin()
 def get_all_users():
     users = db.users.find({})
     user_dict = {'ADMIN': [], 'PENTESTER': [], 'RAPPORTER': []}
@@ -132,9 +132,9 @@ def get_all_users():
     return jsonify(user_dict), 200
 
 @app.route('/scan/subdomain', methods=['POST'])
+@cross_origin()
 @jwt_required()
 @pentester_required
-@cross_origin()
 def scan_subdomain():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -157,9 +157,9 @@ def scan_subdomain():
     return jsonify(results.to_dict()), 200
 
 @app.route('/scan/url_fuzzer', methods=['POST'])
+@cross_origin()
 @jwt_required()
 @pentester_required
-@cross_origin()
 def url_fuzzer_domain():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -187,9 +187,9 @@ def url_fuzzer_domain():
     return jsonify({"scan_id": scan_id}), 200
 
 @app.route('/result/scan/url_fuzzer', methods=['GET'])
+@cross_origin()
 @jwt_required()
 @rapporter_or_pentester_required
-@cross_origin()
 def get_scan_result():
     scan_id = request.args.get('scan_id')
     domain = request.args.get('domain')
@@ -213,9 +213,9 @@ def get_scan_result():
     return jsonify({"error": "Scan introuvable"}), 400
 
 @app.route('/scan/ports', methods=['POST'])
+@cross_origin()
 @jwt_required()
 @pentester_required
-@cross_origin()
 def scan_ports():
     if not request.is_json:
         return jsonify({"msg": "Missing JSON in request"}), 400
@@ -250,9 +250,9 @@ def scan_ports():
     return jsonify({"scans_ids": scans_ids}), 200
 
 @app.route('/result/scan/ports', methods=['GET'])
+@cross_origin()
 @jwt_required()
 @rapporter_or_pentester_required
-@cross_origin()
 def get_port_scan_result():
     scan_id = request.args.get('scan_id')
     ip = request.args.get('ip')
@@ -276,9 +276,9 @@ def get_port_scan_result():
     return jsonify({"error": "Scan introuvable"}), 400
 
 @app.route('/my_scans', methods=['GET'])
+@cross_origin()
 @jwt_required()
 @pentester_required
-@cross_origin()
 def get_current_user_scans():
     username = get_jwt_identity()
     url_scans = db.urls.find({'user': username})
@@ -299,9 +299,9 @@ def get_current_user_scans():
     return jsonify(url_scans=url_scans, host_scans=host_scans, port_scans=port_scans), 200
 
 @app.route('/result/scans', methods=['GET'])
+@cross_origin()
 @jwt_required()
 @rapporter_or_pentester_required
-@cross_origin()
 def get_user_scans():
     username = request.args.get('username')
 
